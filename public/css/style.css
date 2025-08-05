@@ -1,0 +1,159 @@
+/* Reset some default styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f4f4f8;
+    color: #333;
+}
+
+/* Main container */
+.main-container {
+    display: flex;
+    height: 100vh;
+}
+
+/* Sidebar for contacts */
+.caller-list-wrapper {
+    width: 25%;
+    background-color: #2c3e50;
+    padding: 20px;
+    color: white;
+    overflow-y: auto;
+}
+
+.caller-list-heading {
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #ecf0f1;
+    padding-bottom: 10px;
+}
+
+.caller-list {
+    list-style: none;
+}
+
+.caller-list li {
+    padding: 10px;
+    margin-bottom: 10px;
+    background: #34495e;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.caller-list li:hover {
+    background: #3d566e;
+}
+
+/* Video call section */
+.video-call-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px;
+    position: relative;
+}
+
+/* Username input */
+.username-input {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.username-input input {
+    flex: 1;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+.username-input button {
+    padding: 10px 20px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.username-input button:hover {
+    background-color: #2980b9;
+}
+
+/* Video streams */
+.video-streams {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    flex-grow: 1;
+    align-items: center;
+}
+
+.local-video,
+.remote-video {
+    flex: 1;
+    background: #000;
+    border: 2px solid #ccc;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+video {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 10px;
+}
+
+/* End Call Button */
+#end-call-btn {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    display: none; /* Initially hidden */
+    z-index: 10;
+}
+
+#end-call-btn img {
+    width: 60px;
+    height: 60px;
+    transition: transform 0.2s ease-in-out;
+}
+
+#end-call-btn:hover img {
+    transform: scale(1.1);
+}
+
+/* Hide elements dynamically */
+.d-none {
+    display: none !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .main-container {
+        flex-direction: column;
+    }
+
+    .caller-list-wrapper {
+        width: 100%;
+        height: 150px;
+        overflow-x: scroll;
+    }
+
+    .video-streams {
+        flex-direction: column;
+    }
+}

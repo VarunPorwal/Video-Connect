@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Video Room | VideoConnect</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
+  <!-- 🔴 CHANGED: Updated script src path for socket.io -->
+  <script src="/socket.io/socket.io.js" defer></script>
+  <script src="/js/main.js" defer></script>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 font-sans h-screen overflow-hidden">
+
+  <!-- Navbar -->
+  <nav class="bg-white shadow-md border-b-4 border-purple-300 z-10">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <i class="fas fa-video text-purple-600 text-2xl"></i>
+        <span class="font-bold text-xl text-gray-800">VideoConnect</span>
+      </div>
+      <a href="/" class="bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700">Back to Home</a>
+    </div>
+  </nav>
+
+  <!-- Main Body -->
+  <main class="flex h-[calc(100vh-72px)]">
+    <!-- Video Section -->
+    <section class="flex-1 flex flex-col justify-between p-6 bg-gray-100 overflow-hidden">
+
+      <!-- Video Grid -->
+      <div class="flex-1 grid md:grid-cols-2 gap-6 h-full">
+        
+        <!-- Local Video -->
+        <div class="relative bg-black rounded-2xl border-4 border-purple-300 shadow-xl h-full overflow-hidden">
+          <video id="localVideo" autoplay muted playsinline class="w-full h-full object-cover rounded-2xl"></video>
+          
+          <!-- 🔴 CHANGED: Added id="localName" for dynamic name display -->
+          <!-- OLD: <span class="absolute bottom-4 left-4 bg-purple-600 text-white text-sm px-3 py-1 rounded-full">You</span> -->
+          <span id="localName" class="absolute bottom-4 left-4 bg-purple-600 text-white text-sm px-3 py-1 rounded-full">You</span>
+        </div>
+
+        <!-- Remote Video -->
+        <div class="relative bg-black rounded-2xl border-4 border-purple-300 shadow-xl h-full overflow-hidden">
+          <video id="remoteVideo" autoplay playsinline class="w-full h-full object-cover rounded-2xl"></video>
+          
+          <!-- 🔴 Dynamic remote name (UNCHANGED structure, but default text updated) -->
+          <!-- OLD default text: "Remote" -->
+          <!-- NEW default text: "Waiting for user..." -->
+          <span id="remoteName" class="absolute bottom-4 left-4 bg-gray-800 text-white text-sm px-3 py-1 rounded-full">
+            Waiting for user...
+          </span>
+
+          <!-- Remote Mic/Camera Status (UNCHANGED) -->
+          <div class="absolute top-4 right-4 space-x-2">
+            <i id="remoteMicIcon" class="fas fa-microphone-slash text-white text-lg hidden bg-red-600 rounded-full p-2"></i>
+            <i id="remoteCamIcon" class="fas fa-video-slash text-white text-lg hidden bg-red-600 rounded-full p-2"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Call Controls (COMPLETELY UNCHANGED) -->
+      <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex justify-center items-center gap-6 z-50">
+        
+        <!-- Mic Toggle -->
+        <button id="micBtn" class="bg-white p-3 rounded-full border border-gray-300 shadow hover:bg-red-100">
+          <i id="micIcon" class="fas fa-microphone text-gray-700 text-xl"></i>
+        </button>
+
+        <!-- Camera Toggle -->
+        <button id="cameraBtn" class="bg-white p-3 rounded-full border border-gray-300 shadow hover:bg-red-100">
+          <i id="camIcon" class="fas fa-video text-gray-700 text-xl"></i>
+        </button>
+
+        <!-- End Call -->
+        <button id="end-call-btn" class="bg-red-600 hover:bg-red-700 p-4 rounded-full shadow-lg">
+          <i class="fas fa-phone-slash text-white text-xl"></i>
+        </button>
+      </div>
+
+    </section>
+  </main>
+</body>
+</html>
