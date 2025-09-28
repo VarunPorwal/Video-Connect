@@ -5,6 +5,22 @@ import fs from 'fs';
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 const fileManager = new GoogleAIFileManager(process.env.GOOGLE_API_KEY);
 
+async function clearStaleRecordings(roomId) {
+  try {
+    const recordingPath = `./recordings/${roomId}`;
+    if (fs.existsSync(recordingPath)) {
+      const files = fs.readdirSync(recordingPath);
+      for (const file of files) {
+        fs.unlinkSync(`${recordingPath}/${file}`);
+      }
+      fs.rmdirSync(recordingPath);
+      console.log(`✅ Cleared recordings for room ${roomId}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error clearing recordings for room ${roomId}:`, error);
+  }
+}
+
 export async function transcribeAndSummarizeCall(audioFiles, roomId) {
   console.log(`🎙️ Starting AI processing for room ${roomId}...`);
   
@@ -23,7 +39,7 @@ export async function transcribeAndSummarizeCall(audioFiles, roomId) {
         
         console.log(`✅ Audio uploaded for ${audioFile.user}`);
         
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         
         const transcriptionResult = await model.generateContent([
           {
@@ -64,7 +80,7 @@ export async function transcribeAndSummarizeCall(audioFiles, roomId) {
       `${t.user}: ${t.transcript}`
     ).join('\n\n');
     
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     
     const summaryResult = await model.generateContent([
   `Create a brief, personalized summary of this conversation for each participant.
@@ -85,6 +101,9 @@ Provide a short, natural summary of what happened in the call.`
     const summary = summaryResult.response.text();
     console.log('✅ Summary generated successfully');
     
+    // Add cleanup at the end
+    await clearStaleRecordings(roomId);
+    
     return {
       transcriptions,
       summary,
@@ -93,6 +112,8 @@ Provide a short, natural summary of what happened in the call.`
     
   } catch (error) {
     console.error('❌ Error in AI processing:', error.message);
+    // Still try to cleanup even if processing failed
+    await clearStaleRecordings(roomId);
     return {
       transcriptions,
       summary: 'AI processing failed due to an error. Please check the logs.',

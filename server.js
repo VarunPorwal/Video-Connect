@@ -17,6 +17,9 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Use PORT environment variable for production (Render sets this automatically)
+const PORT = process.env.PORT || 9000;
+
 app.use(express.static("public"));
 
 ["index", "start-call", "join-room", "call-room"].forEach(page =>
@@ -115,8 +118,15 @@ io.on("connection", socket => {
   });
 });
 
+// Ensure recordings directory exists
+const recordingsDir = "./recordings";
+if (!fs.existsSync(recordingsDir)) {
+  fs.mkdirSync(recordingsDir, { recursive: true });
+  console.log("📁 Created recordings directory");
+}
+
 const storage = multer.diskStorage({
-  destination: "recordings/",
+  destination: recordingsDir,
   filename: (req, file, cb) => cb(null, file.originalname)
 });
 const upload = multer({ storage });
@@ -148,6 +158,15 @@ app.post("/upload-audio", upload.single("audio"), (req, res) => {
   res.json({ status: "ok" });
 });
 
+// Health check endpoint for Render
+app.get("/health", (req, res) => {
+  res.json({ 
+    status: "healthy", 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development"
+  });
+});
+
 // Check email credentials only when needed (post-call)
 function checkEmailCredentials() {
   const hasEmailUser = process.env.EMAIL_USER && process.env.EMAIL_USER.trim() !== '';
@@ -156,6 +175,8 @@ function checkEmailCredentials() {
 }
 
 async function processCall(roomId) {
+  let processingComplete = false;
+  
   try {
     const result = await transcribeAndSummarizeCall(callRecordings[roomId].audioFiles, roomId);
     
@@ -192,6 +213,7 @@ async function processCall(roomId) {
             const emailSent = await sendCallSummary(participant, result.summary, callDetails);
             if (emailSent) {
               emailsSent = true;
+              console.log(`✅ Email sent to ${participant.user}`);
             } else {
               console.log(`⚠️ Email delivery failed for ${participant.user}`);
             }
@@ -206,84 +228,86 @@ async function processCall(roomId) {
         }
       } else {
         console.log('\n📧 Email credentials not provided - skipping email delivery');
-        console.log('💡 To enable emails, add EMAIL_USER and EMAIL_PASS to your .env file');
+        console.log('💡 To enable emails, add EMAIL_USER and EMAIL_PASS to your environment variables');
       }
       
       // Send to n8n webhook if configured
       if (process.env.N8N_WEBHOOK_URL) {
-        const payload = {
-          roomId,
-          callDate: new Date().toISOString(),
-          transcriptions: result.transcriptions,
-          summary: result.summary,
-          participants: [...callRecordings[roomId].participants],
-          emailsSent: emailsSent,
-          emailCredentialsProvided: checkEmailCredentials()
-        };
-        
-        await fetch(process.env.N8N_WEBHOOK_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        console.log('\n📤 Results also sent to n8n webhook');
+        try {
+          const payload = {
+            roomId,
+            callDate: new Date().toISOString(),
+            transcriptions: result.transcriptions,
+            summary: result.summary,
+            participants: [...callRecordings[roomId].participants],
+            emailsSent: emailsSent,
+            emailCredentialsProvided: checkEmailCredentials()
+          };
+          
+          await fetch(process.env.N8N_WEBHOOK_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          console.log('\n📤 Results also sent to n8n webhook');
+        } catch (webhookError) {
+          console.error('⚠️ n8n webhook failed:', webhookError.message);
+        }
       }
+      
+      processingComplete = true;
       
     } else {
       console.log('⚠️ AI processing failed, trying n8n fallback...');
       
       if (process.env.N8N_WEBHOOK_URL) {
-        const payload = {
-          roomId,
-          callDate: new Date().toISOString(),
-          audioFiles: callRecordings[roomId].audioFiles
-                     .map(f => ({ 
-                       user: f.user, 
-                       email: f.email,
-                       fileName: path.basename(f.file) 
-                     })),
-          participants: [...callRecordings[roomId].participants],
-          emailsSent: false,
-          emailCredentialsProvided: checkEmailCredentials(),
-          aiProcessingFailed: true
-        };
-        
-        await fetch(process.env.N8N_WEBHOOK_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        console.log('📤 Sent to n8n successfully (fallback)');
+        try {
+          const payload = {
+            roomId,
+            callDate: new Date().toISOString(),
+            audioFiles: callRecordings[roomId].audioFiles
+                       .map(f => ({ 
+                         user: f.user, 
+                         email: f.email,
+                         fileName: path.basename(f.file) 
+                       })),
+            participants: [...callRecordings[roomId].participants],
+            emailsSent: false,
+            emailCredentialsProvided: checkEmailCredentials(),
+            aiProcessingFailed: true
+          };
+          
+          await fetch(process.env.N8N_WEBHOOK_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          console.log('📤 Sent to n8n successfully (fallback)');
+        } catch (webhookError) {
+          console.error('⚠️ n8n fallback webhook failed:', webhookError.message);
+        }
       }
+      
+      processingComplete = true;
     }
-    
-    callRecordings[roomId].audioFiles.forEach(f => {
-      try {
-        fs.unlinkSync(f.file);
-      } catch (err) {
-        console.log(`🗑️ File already deleted: ${f.file}`);
-      }
-    });
-    
-    delete callRecordings[roomId];
-    console.log('\n✅ Call processing completed!\n');
     
   } catch (error) {
     console.error('❌ Error processing call:', error.message);
     
-    try {
-      if (process.env.N8N_WEBHOOK_URL) {
+    // Send error to n8n but continue with cleanup
+    if (process.env.N8N_WEBHOOK_URL) {
+      try {
         const payload = {
           roomId,
           callDate: new Date().toISOString(),
-          audioFiles: callRecordings[roomId].audioFiles
-                     .map(f => ({ 
+          audioFiles: callRecordings[roomId]?.audioFiles
+                     ?.map(f => ({ 
                        user: f.user, 
                        email: f.email,
                        fileName: path.basename(f.file) 
-                     })),
-          participants: [...callRecordings[roomId].participants],
-          error: 'AI processing failed',
+                     })) || [],
+          participants: callRecordings[roomId] ? [...callRecordings[roomId].participants] : [],
+          error: 'Call processing failed - ' + error.message,
           emailCredentialsProvided: checkEmailCredentials()
         };
         
@@ -293,20 +317,60 @@ async function processCall(roomId) {
           body: JSON.stringify(payload)
         });
         console.log('📤 Error details sent to n8n');
+      } catch (webhookError) {
+        console.error('⚠️ Error webhook failed:', webhookError.message);
       }
-    } catch {}
+    }
+    
+    processingComplete = true;
+  }
+  
+  // Cleanup recordings after processing is complete
+  if (processingComplete && callRecordings[roomId]) {
+    console.log('\n🗑️ Cleaning up recordings...');
     
     callRecordings[roomId].audioFiles.forEach(f => {
-      try { fs.unlinkSync(f.file); } catch {}
+      try {
+        fs.unlinkSync(f.file);
+        console.log(`✅ Deleted: ${path.basename(f.file)}`);
+      } catch (err) {
+        console.log(`⚠️ File already deleted: ${path.basename(f.file)}`);
+      }
     });
+    
     delete callRecordings[roomId];
+    console.log(`✅ Room ${roomId} cleanup completed`);
   }
+  
+  console.log('\n✅ Call processing completed!\n');
 }
 
-server.listen(9000, '0.0.0.0', () => {
-  console.log("Server running on http://localhost:9000");
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
+  console.log('🔄 SIGTERM received, shutting down gracefully...');
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('🔄 SIGINT received, shutting down gracefully...');
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
+});
+
+// Start server with production-ready configuration
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log('🔧 AI Transcription Service Ready');
   
-  // Simple startup message - no email config check here
-  console.log('\n🔧 AI Transcription Service Ready');
- 
+  // Log configuration status (without exposing sensitive data)
+  console.log('\n📊 Configuration Status:');
+  console.log(`   📧 Email Service: ${checkEmailCredentials() ? '✅ Configured' : '⚠️ Not configured'}`);
+  console.log(`   🔗 n8n Webhook: ${process.env.N8N_WEBHOOK_URL ? '✅ Configured' : '⚠️ Not configured'}`);
+  console.log(`   🤖 Google AI: ${process.env.GOOGLE_API_KEY ? '✅ Configured' : '❌ Missing API key'}`);
 });
