@@ -5,21 +5,7 @@ import fs from 'fs';
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 const fileManager = new GoogleAIFileManager(process.env.GOOGLE_API_KEY);
 
-async function clearStaleRecordings(roomId) {
-  try {
-    const recordingPath = `./recordings/${roomId}`;
-    if (fs.existsSync(recordingPath)) {
-      const files = fs.readdirSync(recordingPath);
-      for (const file of files) {
-        fs.unlinkSync(`${recordingPath}/${file}`);
-      }
-      fs.rmdirSync(recordingPath);
-      console.log(`✅ Cleared recordings for room ${roomId}`);
-    }
-  } catch (error) {
-    console.error(`❌ Error clearing recordings for room ${roomId}:`, error);
-  }
-}
+// REMOVED: clearStaleRecordings function - it was causing stuck issues
 
 export async function transcribeAndSummarizeCall(audioFiles, roomId) {
   console.log(`🎙️ Starting AI processing for room ${roomId}...`);
@@ -83,7 +69,7 @@ export async function transcribeAndSummarizeCall(audioFiles, roomId) {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     
     const summaryResult = await model.generateContent([
-  `Create a brief, personalized summary of this conversation for each participant.
+      `Create a brief, personalized summary of this conversation for each participant.
 
 TRANSCRIPTIONS:
 ${combinedTranscript}
@@ -96,13 +82,13 @@ Instructions:
 5. Don't add business formatting or bullet points
 
 Provide a short, natural summary of what happened in the call.`
-]);
+    ]);
     
     const summary = summaryResult.response.text();
     console.log('✅ Summary generated successfully');
     
-    // Add cleanup at the end
-    await clearStaleRecordings(roomId);
+    // REMOVED: await clearStaleRecordings(roomId); ← This was causing the stuck issue
+    // File cleanup is handled in server.js processCall() function instead
     
     return {
       transcriptions,
@@ -112,8 +98,7 @@ Provide a short, natural summary of what happened in the call.`
     
   } catch (error) {
     console.error('❌ Error in AI processing:', error.message);
-    // Still try to cleanup even if processing failed
-    await clearStaleRecordings(roomId);
+    // REMOVED: cleanup attempt here - let server.js handle it
     return {
       transcriptions,
       summary: 'AI processing failed due to an error. Please check the logs.',
