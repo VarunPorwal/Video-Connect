@@ -100,7 +100,6 @@ io.on("connection", socket => {
               delete roomUsers[roomId];
               
               if (callRecordings[roomId] && callRecordings[roomId].participants.size < 2) {
-                console.log(`Clearing stale recordings for room ${roomId}`);
                 callRecordings[roomId].audioFiles.forEach(f => {
                   try { 
                     fs.unlinkSync(f.file); 
