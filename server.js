@@ -150,8 +150,11 @@ app.post("/upload-audio", upload.single("audio"), (req, res) => {
   console.log(`Audio of ${userName} recorded (${callRecordings[roomId].participants.size}/2)`);
 
   if (callRecordings[roomId].participants.size === 2) {
-    console.log(`Both users audio recorded, processing call...`);
-    processCall(roomId);
+    console.log(`Both users audio recorded, processing call in 2 seconds...`);
+    // ⭐ OPTION 1 FIX: Add 2-second delay to ensure all uploads complete
+    setTimeout(() => {
+      processCall(roomId);
+    }, 2000);
   }
 
   res.json({ status: "ok" });
