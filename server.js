@@ -54,6 +54,12 @@ io.on("connection", socket => {
       socketId: socket.id
     });
 
+    // ⭐ FIXED: Start recording when both users join (during call, not after)
+    if (roomUsers[roomId].length === 2) {
+      console.log(`Both users joined room ${roomId}, recording can start when call begins`);
+      io.to(roomId).emit("ready-to-record");
+    }
+
     socket.on("offer", data => {
       socket.to(roomId).emit("offer", data);
     });
@@ -69,12 +75,14 @@ io.on("connection", socket => {
     socket.on("end-call", ({ roomId }) => {
       console.log(`Call ended in room ${roomId} by ${userName}`);
       
-      io.to(roomId).emit("call-ended");
+      // ⭐ FIXED: Signal to stop recording and upload
+      io.to(roomId).emit("stop-recording-and-upload");
+      
       socket.to(roomId).emit("user-left", { userName, socketId: socket.id });
       
       setTimeout(() => {
         io.to(roomId).emit("call-ended");
-      }, 3000);
+      }, 8000); // ⭐ INCREASED: Give time for recording to complete and upload
     });
 
     socket.on("toggle-mic", ({ roomId, userName, micEnabled }) => {
@@ -99,6 +107,7 @@ io.on("connection", socket => {
             if (roomUsers[roomId] && roomUsers[roomId].length === 0) {
               delete roomUsers[roomId];
               
+              // Clean up incomplete recordings
               if (callRecordings[roomId] && callRecordings[roomId].participants.size < 2) {
                 callRecordings[roomId].audioFiles.forEach(f => {
                   try { 
@@ -108,7 +117,7 @@ io.on("connection", socket => {
                 delete callRecordings[roomId];
               }
             }
-          }, 5000);
+          }, 10000); // ⭐ INCREASED: More time for audio upload
         } else {
           io.to(roomId).emit("room-users-updated", roomUsers[roomId]);
         }
@@ -150,11 +159,8 @@ app.post("/upload-audio", upload.single("audio"), (req, res) => {
   console.log(`Audio of ${userName} recorded (${callRecordings[roomId].participants.size}/2)`);
 
   if (callRecordings[roomId].participants.size === 2) {
-    console.log(`Both users audio recorded, processing call in 2 seconds...`);
-    // ⭐ OPTION 1 FIX: Add 2-second delay to ensure all uploads complete
-    setTimeout(() => {
-      processCall(roomId);
-    }, 2000);
+    console.log(`Both users audio recorded, processing call...`);
+    processCall(roomId);
   }
 
   res.json({ status: "ok" });

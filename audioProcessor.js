@@ -5,8 +5,6 @@ import fs from 'fs';
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 const fileManager = new GoogleAIFileManager(process.env.GOOGLE_API_KEY);
 
-// REMOVED: clearStaleRecordings function - it was causing stuck issues
-
 export async function transcribeAndSummarizeCall(audioFiles, roomId) {
   console.log(`🎙️ Starting AI processing for room ${roomId}...`);
   
@@ -87,9 +85,6 @@ Provide a short, natural summary of what happened in the call.`
     const summary = summaryResult.response.text();
     console.log('✅ Summary generated successfully');
     
-    // REMOVED: await clearStaleRecordings(roomId); ← This was causing the stuck issue
-    // File cleanup is handled in server.js processCall() function instead
-    
     return {
       transcriptions,
       summary,
@@ -98,7 +93,6 @@ Provide a short, natural summary of what happened in the call.`
     
   } catch (error) {
     console.error('❌ Error in AI processing:', error.message);
-    // REMOVED: cleanup attempt here - let server.js handle it
     return {
       transcriptions,
       summary: 'AI processing failed due to an error. Please check the logs.',
